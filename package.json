@@ -1,0 +1,58 @@
+{
+  "name": "auto-form",
+  "version": "1.0.0",
+  "description": "구글 폼 자동 신청 일렉트론 앱",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "set NODE_ENV=test && electron .",
+    "dev": "set NODE_ENV=development && electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
+  },
+  "keywords": ["electron", "google-forms", "automation"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "puppeteer-core": "^21.5.0",
+    "node-schedule": "^2.1.1"
+  },
+  "build": {
+    "appId": "com.autoform.app",
+    "productName": "Python Script Runner",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "asset/icon.JPG"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Python Script Runner"
+    },
+    "files": [
+      "**/*",
+      "!data/**/*",
+      "!*.log",
+      "!.git/**/*",
+      "!dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "data/config.example.json",
+        "to": "data/config.example.json"
+      }
+    ]
+  }
+}
+
