@@ -1,0 +1,161 @@
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const { exec } = require('child_process');
+const {
+  runPythonScript,
+  scheduleScriptExecution,
+  scheduledJobs,
+  getPythonScripts,
+  readScriptContent,
+  setScriptsDirectory,
+  loadSchedules,
+  setUserDataPath
+} = require('./scripts/python-runner');
+
+let mainWindow;
+let tray = null;
+
+// ✅ (추가) 싱글 인스턴스 락: 프로세스 중복 실행 방지
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // 이미 실행 중이면(두 번째 실행) 현재 프로세스는 바로 종료
+  app.quit();
+} else {
+  // ✅ (추가) 두 번째 실행이 들어오면, 기존 창을 앞으로
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // 기존 창이 없으면 새로 생성
+    if (!mainWindow) {
+      createWindow();
+    }
+
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+
+    // 트레이가 없으면 생성
+    if (!tray) {
+      createTray();
+    }
+
+    // (옵션) commandLine에 특정 인자/딥링크가 있으면 여기서 처리 가능
+    // const deeplink = commandLine.find(arg => arg.startsWith('myapp://'));
+    // if (deeplink && mainWindow) mainWindow.webContents.send('deeplink', deeplink);
+  });
+
+  // ------------------ 이하 주인님 기존 코드 그대로 ------------------
+
+  function createWindow() {
+    const { nativeImage } = require('electron');
+
+    const isTestMode = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+
+    let iconPath = path.join(__dirname, 'asset', 'icon.JPG');
+    let windowIcon = null;
+
+    if (fs.existsSync(iconPath)) {
+      windowIcon = nativeImage.createFromPath(iconPath);
+    } else {
+      const alternativePaths = [
+        path.join(__dirname, 'build', 'icon.ico'),
+        path.join(__dirname, 'build', 'icon.png'),
+        path.join(__dirname, 'resources', 'icon.ico')
+      ];
+
+      for (const altPath of alternativePaths) {
+        if (fs.existsSync(altPath)) {
+          windowIcon = nativeImage.createFromPath(altPath);
+          break;
+        }
+      }
+    }
+
+    mainWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        devTools: isTestMode
+      },
+      backgroundColor: '#1e1e1e',
+      icon: windowIcon || undefined
+    });
+
+    mainWindow.loadFile('renderer/index.html');
+
+    mainWindow.on('close', (event) => {
+      if (!app.isQuitting) {
+        event.preventDefault();
+        mainWindow.hide();
+        if (!tray) createTray();
+      }
+    });
+
+    if (isTestMode) {
+      mainWindow.webContents.openDevTools();
+      console.log('🧪 테스트 모드로 실행 중...');
+      console.log('📊 개발자 도구가 자동으로 열렸습니다.');
+    }
+  }
+
+  function createTray() {
+    // ... 주인님 기존 createTray 코드 그대로 ...
+  }
+
+  app.whenReady().then(() => {
+    Menu.setApplicationMenu(null);
+
+    const userDataDir = app.getPath('userData');
+    const dataDir = path.join(userDataDir, 'data');
+
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
+    setUserDataPath(dataDir);
+    loadSchedules();
+
+    createTray();
+    createWindow();
+  });
+
+  app.on('window-all-closed', (event) => {
+    if (process.platform !== 'darwin') {
+      if (mainWindow) mainWindow.hide();
+      if (!tray) createTray();
+    }
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    } else {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+
+  app.on('before-quit', () => {
+    app.isQuitting = true;
+  });
+
+  // ... 이하 ipcMain.handle 들도 전부 그대로 ...
+}
+
+
+
+
+
+
+
+
+
+프로세스중복실행 방지로직인데 나중에 개선해라 박건형 
+1월 12일의 넌 피곤하다
